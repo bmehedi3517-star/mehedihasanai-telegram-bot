@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """
 AI Sniper M1 Pro - production-ready
-Features:
-- yfinance fetch with caching + retry/backoff
-- gunicorn-friendly background thread started with before_first_request
-- Telegram notify (env vars)
-- ENTRY_OFFSET_SECONDS to control how near the entry time is
 """
 import random
 import time
@@ -21,15 +16,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-sniper")
 
-# ==============================
-# CONFIG & ASSETS
-# ==============================
-# ✅ সঠিক: Environment variable থেকে পড়া হচ্ছে
+# ✅ সঠিক Environment Variables
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-
-# ENTRY_OFFSET_SECONDS controls how many seconds from "now" the announced entry time will be.
-# Make it smaller for a nearer entry (e.g., 10), larger for a farther entry (e.g., 30).
 ENTRY_OFFSET_SECONDS = int(os.environ.get("ENTRY_OFFSET_SECONDS", "20"))
 
 ASSETS = {
@@ -47,17 +36,13 @@ ASSETS = {
 PAIR_STATS = {p['name']: {"wins": 0, "losses": 0} for p in ASSETS.values()}
 LAST_SIGNAL = {}
 SIM_BALANCE = 1000
-
-# Cache to avoid hitting yfinance too often
-TICKER_CACHE = {}  # ticker -> {"time": datetime, "df": DataFrame, "failed": bool}
+TICKER_CACHE = {}
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "30"))
 
-# ==============================
-# UTILITIES
-# ==============================
+# ✅ সঠিক Telegram Send Function
 def telegram_send(msg):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.info("Telegram token/chat not set; skipping send.")
+        logger.info("Telegram credentials not configured. Skipping.")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
@@ -65,11 +50,8 @@ def telegram_send(msg):
     except Exception as e:
         logger.warning("Telegram send failed: %s", e)
 
-# ==============================
-# DATA FETCH + ANALYSIS
-# ==============================
 def fetch_recent_1m(ticker):
-    """Fetch 1m data with caching and retry/backoff. Returns DataFrame or None."""
+    """Fetch 1m data with caching and retry/backoff"""
     now = datetime.utcnow()
     cached = TICKER_CACHE.get(ticker)
     if cached:
@@ -88,13 +70,14 @@ def fetch_recent_1m(ticker):
             TICKER_CACHE[ticker] = {"time": now, "df": df, "failed": False}
             return df
         except Exception as e:
-            msg = str(e)
-            logger.warning("yfinance fetch failed for %s (attempt %d/%d): %s", ticker, attempt+1, retries, msg)
-            if "Too Many Requests" in msg or "RateLimit" in msg or "429" in msg:
+            msg_err = str(e)
+            logger.warning("yfinance fetch failed for %s (attempt %d/%d): %s", ticker, attempt+1, retries, msg_err)
+            if "Too Many Requests" in msg_err or "429" in msg_err:
                 time.sleep(backoff * 2)
             else:
                 time.sleep(backoff)
             backoff *= 2
+    
     TICKER_CACHE[ticker] = {"time": now, "df": None, "failed": True}
     return None
 
@@ -122,9 +105,6 @@ def analyze_m1_market(asset_info):
         logger.exception("analyze_m1_market error: %s", e)
         return random.choice(["CALL", "PUT"]), random.randint(70, 95)
 
-# ==============================
-# RESULT CHECKER
-# ==============================
 def check_trade_result(pair_name):
     global SIM_BALANCE
     time.sleep(65)
@@ -138,14 +118,11 @@ def check_trade_result(pair_name):
         SIM_BALANCE -= 100
         telegram_send(f"❌ <b>{pair_name} - LOSS</b>\nRecovering in next move...")
 
-# ==============================
-# SNIPER SCANNER
-# ==============================
 def start_sniper_loop():
     global LAST_SIGNAL
     bd_tz = timezone(timedelta(hours=6))
-
     logger.info("Sniper loop started")
+    
     while True:
         try:
             now = datetime.now(bd_tz)
@@ -198,9 +175,7 @@ def start_sniper_loop():
             logger.exception("Error in sniper loop; sleeping 5s")
             time.sleep(5)
 
-# ==============================
-# DASHBOARD UI
-# ==============================
+# Flask App Setup
 app = Flask(__name__)
 
 @app.route("/")
@@ -221,7 +196,7 @@ def index():
                     <h1 class="text-2xl font-black text-green-400">WOLVES AI <span class="text-xs bg-green-500 text-black px-2 py-1 rounded ml-2">M1 PRO</span></h1>
                     <div class="text-right">
                         <p class="text-[10px] text-slate-400">SYSTEM STATUS</p>
-                        <p class="text-xs font-bold text-blue-400">SCANNING 30S...</p>
+                        <p class="text-xs font-bold text-blue-400">🟢 ACTIVE</p>
                     </div>
                 </div>
 
@@ -261,23 +236,20 @@ def index():
 def api_signal():
     return jsonify(LAST_SIGNAL)
 
-# Start background scanner in a gunicorn-friendly way (safe for all Flask versions)
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"}), 200
+
 def _start_background_thread_once():
-    """
-    Start the background scanner thread exactly once per process.
-    We avoid using @app.before_first_request to be robust across Flask versions.
-    """
     if not getattr(app, "_bg_thread_started", False):
         thread = threading.Thread(target=start_sniper_loop, daemon=True)
         thread.start()
         app._bg_thread_started = True
-        logger.info("Background scanner thread started (module import)")
+        logger.info("Background scanner thread started")
 
-# Call it at module import time so gunicorn workers start the scanner when they load the app.
 _start_background_thread_once()
 
 if __name__ == "__main__":
-    # Local dev only: also start scanner when run directly
     _start_background_thread_once()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
