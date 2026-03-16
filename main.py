@@ -24,8 +24,8 @@ logger = logging.getLogger("ai-sniper")
 # ==============================
 # CONFIG & ASSETS
 # ==============================
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "YOUR_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "YOUR_CHAT_ID")
+TELEGRAM_TOKEN = os.environ.get("8706674449:AAGkkxhpwx7SLblhf2E_G8u_OuQ4djQadFw")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "5698962657")
 
 # ENTRY_OFFSET_SECONDS controls how many seconds from "now" the announced entry time will be.
 # Make it smaller for a nearer entry (e.g., 10), larger for a farther entry (e.g., 30).
