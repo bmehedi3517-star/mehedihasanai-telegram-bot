@@ -26,12 +26,14 @@ try:
     TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     ENTRY_OFFSET_SECONDS = int(os.environ.get("ENTRY_OFFSET_SECONDS", "20"))
     CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "30"))
+    PORT = int(os.environ.get("PORT", "5000"))  # ✅ এটি যোগ করুন
     
-    logger.info(f"Config loaded - Token: {'✓' if TELEGRAM_TOKEN else '✗'}, ChatID: {TELEGRAM_CHAT_ID}, Offset: {ENTRY_OFFSET_SECONDS}s")
+    logger.info(f"Config loaded - Token: {'✓' if TELEGRAM_TOKEN else '✗'}, ChatID: {TELEGRAM_CHAT_ID}, Offset: {ENTRY_OFFSET_SECONDS}s, Port: {PORT}")
 except ValueError as e:
     logger.error(f"Environment variable conversion error: {e}")
     ENTRY_OFFSET_SECONDS = 20
     CACHE_TTL_SECONDS = 30
+    PORT = 5000
 
 ASSETS = {
     "USD/NGN": {"name": "USD/NGN (OTC)", "payout": 93, "ticker": "USDNGN=X"},
@@ -352,6 +354,5 @@ _start_background_thread_once()
 
 if __name__ == "__main__":
     _start_background_thread_once()
-    port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Starting Flask app on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    logger.info(f"Starting Flask app on port {PORT}")
+    app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
