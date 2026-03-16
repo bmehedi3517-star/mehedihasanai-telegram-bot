@@ -256,15 +256,23 @@ def index():
     </html>
     """, sig=LAST_SIGNAL, bal=SIM_BALANCE)
 
-# Start background scanner in a gunicorn-friendly way
-@app.before_first_request
-def activate_job():
-    thread = threading.Thread(target=start_sniper_loop, daemon=True)
-    thread.start()
-    logger.info("Background scanner thread started via before_first_request")
+# Start background scanner in a gunicorn-friendly way (safe for all Flask versions)
+def _start_background_thread_once():
+    """
+    Start the background scanner thread exactly once per process.
+    We avoid using @app.before_first_request to be robust across Flask versions.
+    """
+    if not getattr(app, "_bg_thread_started", False):
+        thread = threading.Thread(target=start_sniper_loop, daemon=True)
+        thread.start()
+        app._bg_thread_started = True
+        logger.info("Background scanner thread started (module import)")
+
+# Call it at module import time so gunicorn workers start the scanner when they load the app.
+_start_background_thread_once()
 
 if __name__ == "__main__":
-    # Local dev only
-    threading.Thread(target=start_sniper_loop, daemon=True).start()
+    # Local dev only: also start scanner when run directly
+    _start_background_thread_once()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
