@@ -24,8 +24,9 @@ logger = logging.getLogger("ai-sniper")
 # ==============================
 # CONFIG & ASSETS
 # ==============================
-TELEGRAM_TOKEN = os.environ.get("8706674449:AAGkkxhpwx7SLblhf2E_G8u_OuQ4djQadFw")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "5698962657")
+# ✅ সঠিক: Environment variable থেকে পড়া হচ্ছে
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # ENTRY_OFFSET_SECONDS controls how many seconds from "now" the announced entry time will be.
 # Make it smaller for a nearer entry (e.g., 10), larger for a farther entry (e.g., 30).
@@ -55,7 +56,7 @@ CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "30"))
 # UTILITIES
 # ==============================
 def telegram_send(msg):
-    if TELEGRAM_TOKEN.startswith("YOUR") or TELEGRAM_CHAT_ID.startswith("YOUR"):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         logger.info("Telegram token/chat not set; skipping send.")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -256,6 +257,10 @@ def index():
     </html>
     """, sig=LAST_SIGNAL, bal=SIM_BALANCE)
 
+@app.route("/api/signal")
+def api_signal():
+    return jsonify(LAST_SIGNAL)
+
 # Start background scanner in a gunicorn-friendly way (safe for all Flask versions)
 def _start_background_thread_once():
     """
@@ -275,4 +280,4 @@ if __name__ == "__main__":
     # Local dev only: also start scanner when run directly
     _start_background_thread_once()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
